@@ -4,6 +4,7 @@ import sys
 import logging
 import getpass
 import re
+import asyncio
 from web3 import Web3
 from eth_account import Account
 from cryptography.fernet import Fernet
