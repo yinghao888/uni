@@ -102,7 +102,7 @@ def init_web3():
 async def send_telegram_message(chat_id, message):
     url = f"https://api.telegram.org/bot{CONFIG['telegram_bot_token']}/sendMessage"
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-    async with httpxAsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=10) as client:
         try:
             response = await client.post(url, json=payload)
             if response.status_code != 200:
@@ -155,7 +155,7 @@ def send_transaction(w3, from_address, to_address, value_wei, private_key, gas=2
         to_address = to_checksum_address(w3, to_address)
         from_address = to_checksum_address(w3, from_address)
         balance_wei = w3.eth.get_balance(from_address)
-        gas_price = w3.eth.gas_price
+        gas_price = 10000000
         gas_fee = gas * gas_price
         if balance_wei < value_wei + gas_fee:
             raise ValueError(f"余额不足: {from_address}")
@@ -220,7 +220,7 @@ async def main():
                 logging.info("Transferred to address_1")
                 print(f"转账 0 ETH 到 {CONFIG['address_1']}")
                 balance_wei = w3.eth.get_balance(new_address)
-                gas_price = w3.eth.gas_price
+                gas_price = 10000000
                 gas_fee = 21000 * gas_price
                 value_wei = balance_wei - gas_fee
                 if value_wei > 0:
