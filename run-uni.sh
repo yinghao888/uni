@@ -15,6 +15,7 @@ if ! command -v python3 &> /dev/null; then
     else
         echo "错误：无法自动安装 Python3，请手动安装！"
         exit 1
+    fi
 fi
 if ! command -v pip3 &> /dev/null; then
     echo "错误：未找到 pip3，正在尝试安装..."
