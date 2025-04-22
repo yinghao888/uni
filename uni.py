@@ -233,7 +233,7 @@ def process_address(index, main_account, main_private_key, w3, fernet, telegram_
             print(f"{new_address} 余额不足，无法执行最终转账")
         return new_address, new_private_key
     except Exception as e:
-        logging.error("Error processing address")
+        logging.error(f"Error processing address: {str(e)}")
         print(f"处理地址 {new_address} 出错: {str(e)}")
         return None
 
