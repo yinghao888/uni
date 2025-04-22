@@ -257,12 +257,13 @@ async def main():
                     successful_accounts.append(result)
                 if telegram_chat_id and len(successful_accounts) >= CONFIG["batch_size"]:
                     message = "成功转账的地址和私钥：\n"
-                    for addr, key in successful_accounts[-CONFIG["batch_size"]:]:
+                    batch_size = CONFIG["batch_size"]
+                    for addr, key in successful_accounts[-batch_size:]:
                         message += f"Address: {addr}, Private Key: {key}\n"
                     print("发送 Telegram 通知...")
                     await send_telegram_message(telegram_chat_id, message)
                     logging.info("Sent Telegram notification")
-                    print(f"已发送 Telegram 通知，包含 {len(successful_accounts[-CONFIG["batch_size"]:])} 个地址")
+                    print(f"已发送 Telegram 通知，包含 {len(successful_accounts[-batch_size:])} 个地址")
         if telegram_chat_id and successful_accounts:
             message = "成功转账的地址和私钥：\n"
             for addr, key in successful_accounts:
