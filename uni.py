@@ -36,7 +36,8 @@ CONFIG = {
     "private_keys_file": "/root/private_keys.txt",
     "telegram_bot_token": "8070858648:AAGfrK1u0IaiXjr4f8TRbUDD92uBGTXdt38",
     "batch_size": 20,
-    "rpc_timeout": 10
+    "rpc_timeout": 10,
+    "chain_id": 130
 }
 
 def validate_private_key(private_key):
@@ -165,10 +166,12 @@ def send_transaction(w3, from_address, to_address, value_wei, private_key, gas=2
             'value': value_wei,
             'gas': gas,
             'gasPrice': gas_price,
-            'chainId': w3.eth.chain_id
+            'chainId': CONFIG["chain_id"]
         }
         signed_tx = w3.eth.account.sign_transaction(tx, private_key)
-        raw_tx = getattr(signed_tx, 'raw_transaction', signed_tx.rawTransaction)
+        raw_tx = getattr(signed_tx, 'raw_transaction', getattr(signed_tx, 'rawTransaction', None))
+        if raw_tx is None:
+            raise AttributeError("无法获取签名交易的 raw_transaction 或 rawTransaction")
         tx_hash = w3.eth.send_raw_transaction(raw_tx)
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         if receipt.status == 1:
