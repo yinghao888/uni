@@ -15,7 +15,6 @@ if ! command -v python3 &> /dev/null; then
     else
         echo "错误：无法自动安装 Python3，请手动安装！"
         exit 1
-    fi
 fi
 if ! command -v pip3 &> /dev/null; then
     echo "错误：未找到 pip3，正在尝试安装..."
@@ -26,6 +25,9 @@ if ! command -v pip3 &> /dev/null; then
         exit 1
     fi
 fi
+echo "确保安装 web3==6.15.1..."
+pip3 uninstall web3 -y
+pip3 install web3==6.15.1
 echo "正在下载 $SCRIPT_NAME..."
 if ! wget -O "$SCRIPT_PATH" "$REPO_URL/$SCRIPT_NAME"; then
     echo "错误：下载 $SCRIPT_NAME 失败，请检查仓库 URL 或网络！"
