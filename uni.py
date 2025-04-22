@@ -102,7 +102,7 @@ def init_web3():
 async def send_telegram_message(chat_id, message):
     url = f"https://api.telegram.org/bot{CONFIG['telegram_bot_token']}/sendMessage"
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpxAsyncClient(timeout=10) as client:
         try:
             response = await client.post(url, json=payload)
             if response.status_code != 200:
